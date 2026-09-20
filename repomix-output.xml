@@ -1,0 +1,226 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  services/
+    doc_service.py
+  utils/
+    code_parser.py
+  main.py
+requirements.txt
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/services/doc_service.py">
+import os
+import json
+from dotenv import load_dotenv
+from langchain_community.llms import Ollama
+from langchain.prompts import PromptTemplate
+
+load_dotenv()
+
+def generate_readme(raw_code: str, structured_data: dict) -> str:
+    """Pide a Llama 3.1 que genere un README profesional con diagramas Mermaid."""
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://192.168.1.134:11434")
+    
+    llm = Ollama(
+        base_url=base_url,
+        model="llama3.1",
+        temperature=0.2, # Al nivel de temperatura bajo, es más estructurado y técnico
+        num_ctx=8192
+    )
+    
+    template = """
+    Eres un Ingeniero de Software Principal y experto en Arquitectura Técnica. Tu tarea es generar un archivo README.md técnico e impecable en español basado en el análisis de este código fuente.
+
+    Estructura analizada del código (en formato JSON):
+    {datos_estructurados}
+
+    Código fuente original:
+    ```python
+    {codigo_original}
+    ```
+
+    Debes generar un documento Markdown con las siguientes secciones obligatorias:
+    1. 🚀 **Descripción General**: Explicación clara y concisa de qué resuelve este código y su propósito arquitectónico.
+    2. 📊 **Diagrama de Flujo / Arquitectura**: Genera un diagrama de bloques o de flujo utilizando la sintaxis nativa de **Mermaid.js** (encapsulado ÚNICAMENTE dentro de un bloque ```mermaid ... ```). El diagrama debe explicar visualmente cómo interactúan las funciones o cómo fluyen los datos.
+    3. 🛠️ **Explicación Detallada de Componentes**: Desglosa las funciones y clases basándote en los datos estructurados proporcionados. Explica qué hace cada parámetro.
+    4. 💡 **Ejemplo de Integración**: Escribe un bloque de código de ejemplo que demuestre cómo otro desarrollador debería importar y usar este archivo en el mundo real.
+
+    Escribe la documentación de forma profesional, clara y directa.
+    """
+    
+    prompt = PromptTemplate(
+        input_variables=["datos_estructurados", "codigo_original"],
+        template=template
+    )
+    
+    chain = prompt | llm
+    
+    # Convertimos el diccionario de AST a string JSON bonito para que el LLM lo entienda mejor
+    json_data = json.dumps(structured_data, indent=2)
+    
+    return chain.invoke({
+        "datos_estructurados": json_data,
+        "codigo_original": raw_code
+    })
+</file>
+
+<file path="src/utils/code_parser.py">
+import ast
+
+def analyze_python_code(code_string: str) -> dict:
+    """
+    Parsea código Python usando AST y extrae de forma estructurada
+    las clases, métodos, funciones y docstrings.
+    """
+    try:
+        tree = ast.parse(code_string)
+    except SyntaxError as e:
+        return {"error": f"Error de sintaxis en el código: {str(e)}"}
+
+    structure = {
+        "funciones": [],
+        "clases": []
+    }
+
+    for node in ast.walk(tree):
+        # Detectar funciones globales
+        if isinstance(node, ast.FunctionDef) and not isinstance(getattr(node, 'parent', None), ast.ClassDef):
+            args = [arg.arg for arg in node.args.args]
+            structure["funciones"].append({
+                "nombre": node.name,
+                "argumentos": args,
+                "docstring": ast.get_docstring(node) or "Sin documentación interna."
+            })
+        
+        # Detectar clases
+        elif isinstance(node, ast.ClassDef):
+            metodos = []
+            for sub_node in node.body:
+                if isinstance(sub_node, ast.FunctionDef):
+                    m_args = [arg.arg for arg in sub_node.args.args]
+                    metodos.append({
+                        "nombre": sub_node.name,
+                        "argumentos": m_args,
+                        "docstring": ast.get_docstring(sub_node) or "Sin documentación interna."
+                    })
+            
+            structure["clases"].append({
+                "nombre": node.name,
+                "metodos": metodos,
+                "docstring": ast.get_docstring(node) or "Sin documentación interna."
+            })
+
+    return structure
+</file>
+
+<file path="src/main.py">
+import streamlit as st
+from utils.code_parser import analyze_python_code
+from services.doc_service import generate_readme
+
+st.set_page_config(page_title="AI Doc Generator", page_icon="📝", layout="wide")
+
+st.title("📝 Generador Técnico de Documentación (AI)")
+st.markdown("Analiza la arquitectura de tu código local mediante AST y genera READMEs con diagramas integrados de forma privada.")
+
+# Ofrecer dos opciones: Subir archivo o pegar texto
+modo = st.radio("Selecciona método de entrada:", ["Pegar código en texto", "Subir archivo .py"])
+codigo_fuente = ""
+
+if modo == "Pegar código en texto":
+    codigo_fuente = st.text_area("Pega tu código Python aquí:", height=250, placeholder="def mi_funcion()...")
+else:
+    uploaded_file = st.file_uploader("Sube tu archivo de Python (.py)", type="py")
+    if uploaded_file is not None:
+        codigo_fuente = uploaded_file.read().decode("utf-8")
+        st.success("Archivo cargado correctamente.")
+
+if codigo_fuente:
+    if st.button("🚀 Generar Documentación Técnica"):
+        with st.status("Procesando ingeniería inversa del código...", expanded=True) as status:
+            try:
+                # Paso 1: Realizar el Parsing con AST
+                status.write("Ejecutando Parser AST (Analizando funciones, clases y firmas)...")
+                datos_arquitectura = analyze_python_code(codigo_fuente)
+                
+                if "error" in datos_arquitectura:
+                    status.update(label="Error de sintaxis", state="error")
+                    st.error(datos_arquitectura["error"])
+                else:
+                    # Paso 2: Enviar al Servidor Local
+                    status.write("Estructura extraída con éxito. Enviando mapa sintáctico a Llama 3.1 en CasaOS...")
+                    readme_final = generate_readme(codigo_fuente, datos_arquitectura)
+                    
+                    status.update(label="¡README.md e ingeniería de diagramas completada!", state="complete")
+                    
+                    st.markdown("---")
+                    st.subheader("📋 Archivo README.md Generado")
+                    
+                    # Botón para descargar el archivo resultante listo para Git
+                    st.download_button(
+                        label="💾 Descargar README.md",
+                        data=readme_final,
+                        file_name="README.md",
+                        mime="text/markdown"
+                    )
+                    
+                    # Mostrar la documentación renderizada en pantalla
+                    st.markdown(readme_final)
+                    
+            except Exception as e:
+                status.update(label="Error en el proceso", state="error")
+                st.error(f"Error del sistema: {str(e)}")
+</file>
+
+<file path="requirements.txt">
+streamlit==1.32.0
+langchain==0.1.13
+langchain-community==0.0.29
+python-dotenv==1.0.1
+</file>
+
+</files>
