@@ -1,5 +1,7 @@
 # Generador Técnico de Documentación AI
 
+> **Este proyecto continúa en [suite-ia-local](https://github.com/EnderFairXD/suite-ia-local)**, que junta las cinco herramientas de IA local (contratos, documentación, correo, reuniones y estudio) con código común, tests y soporte para textos largos. Este repositorio queda archivado como referencia.
+
 Una aplicación web que utiliza parsing AST (Abstract Syntax Tree) para realizar ingeniería inversa en código Python y genera automáticamente archivos `README.md` técnicos con diagramas de flujo integrados (Mermaid.js). Todo procesado de forma local y privada usando Ollama (Llama 3.1).
 
 ## Requisitos Previos
